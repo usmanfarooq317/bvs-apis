@@ -1,9 +1,7 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session
+from flask import Flask, render_template_string, request, jsonify
 import requests, json
 
 app = Flask(__name__)
-app.secret_key = "supersecret"
-app.config["SESSION_TYPE"] = "filesystem"
 
 HTML_PAGE = """
 <!DOCTYPE html>
@@ -11,36 +9,76 @@ HTML_PAGE = """
 <head>
     <title>Run All APIs</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f3f3f3; padding: 20px; }
-        h1 { color: #333; }
-        textarea { width: 100%; height: 500px; font-family: monospace; font-size: 14px; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px;
-                 border-radius: 6px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #0056b3; }
-        input { padding: 8px; font-size: 16px; width: 300px; }
-        label { font-weight: bold; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f2f4f8; margin: 0; padding: 30px; }
+        h1 { color: #222; text-align: center; margin-bottom: 30px; }
+        button {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 0 auto 30px;
+        }
+        button:hover { background: #005ea6; }
+        .response-container {
+            background: white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            padding: 20px;
+        }
+        .response-container h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #0078d4;
+        }
+        pre {
+            background: #f7f9fc;
+            border-radius: 8px;
+            padding: 15px;
+            overflow-x: auto;
+            border: 1px solid #e2e8f0;
+        }
+        .loading {
+            text-align: center;
+            font-size: 18px;
+            color: #0078d4;
+        }
     </style>
+    <script>
+        async function runAllAPIs() {
+            document.getElementById('responses').innerHTML = '<p class="loading">Running all APIs... Please wait ⏳</p>';
+            const formData = new FormData();
+            formData.append('user', '923431664399');
+
+            const response = await fetch('/run_all', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            const container = document.getElementById('responses');
+            container.innerHTML = '';
+            for (const [key, value] of Object.entries(data)) {
+                const div = document.createElement('div');
+                div.className = 'response-container';
+                div.innerHTML = `<h2>${key}</h2><pre>${JSON.stringify(value, null, 4)}</pre>`;
+                container.appendChild(div);
+            }
+        }
+    </script>
 </head>
 <body>
     <h1>Run All APIs</h1>
-    <form method="POST" action="/run_all">
-        <label>Mobile Number:</label>
-        <input type="text" name="user" value="923431664399" readonly /><br><br>
-        <button type="submit">Run All APIs</button>
-    </form>
-
-    {% if final_response %}
-    <h2>API Responses</h2>
-    <textarea readonly>{{ final_response }}</textarea>
-    {% endif %}
+    <button onclick="runAllAPIs()">Run All APIs</button>
+    <div id="responses"></div>
 </body>
 </html>
 """
 
 @app.route("/", methods=["GET"])
-def home():
-    final_response = session.pop("final_response", None)
-    return render_template_string(HTML_PAGE, final_response=final_response)
+def index():
+    return render_template_string(HTML_PAGE)
 
 @app.route("/run_all", methods=["POST"])
 def run_all():
@@ -60,16 +98,16 @@ def run_all():
     try:
         otp_payload = {"MSISDN": user}
         otp_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/RetailerBVSLogin/OTPGeneration"
-        otp_res = requests.post(otp_url, headers=headers, data=json.dumps(otp_payload))
+        otp_res = requests.post(otp_url, headers=headers, json=otp_payload)
         responses["OTP_API"] = otp_res.json()
     except Exception as e:
         responses["OTP_API"] = {"error": str(e)}
 
-    # --- 2️⃣ RetailerBVSLogin API ---
+    # --- 2️⃣ RetailerBVSLogin ---
     try:
         login_payload = {"OTP": otp, "User": f"{user}@1010", "Pin": pin}
         login_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/RetailerBVSLogin"
-        login_res = requests.post(login_url, headers=headers, data=json.dumps(login_payload))
+        login_res = requests.post(login_url, headers=headers, json=login_payload)
         login_data = login_res.json()
         responses["RetailerBVSLogin"] = login_data
 
@@ -79,7 +117,7 @@ def run_all():
         responses["RetailerBVSLogin"] = {"error": str(e)}
         access_token, session_id = None, None
 
-    # ✅ Common headers (with AccessToken & SessionID)
+    # Common headers
     common_headers = {
         **headers,
         "Authorization": f"Bearer {access_token}",
@@ -105,20 +143,19 @@ def run_all():
             "MPOS": "1111@923355923388"
         }
 
-        # ✅ Use valid common headers (includes token/sessionid)
         deposit_res = requests.post(deposit_url, headers=common_headers, json=deposit_payload)
         deposit_data = deposit_res.json()
         responses["CashDeposit"] = deposit_data
-        transaction_id = deposit_data.get("TransactionID")
+        transaction_id_deposit = deposit_data.get("TransactionID")
     except Exception as e:
         responses["CashDeposit"] = {"error": str(e)}
-        transaction_id = None
+        transaction_id_deposit = None
 
-    # --- 4️⃣ CashDepositConfirmation (Run 2 Times) ---
+    # --- 4️⃣ CashDepositConfirmation (Run Twice) ---
     try:
         confirmation_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCashDeposit/CashDepositBVS/Confirmation"
-        confirmation_payload = {
-            "TransactionID": transaction_id,
+        confirm_payload = {
+            "TransactionID": transaction_id_deposit,
             "TermsAccepted": "true",
             "DepositAmount": "100",
             "Longitude": "31.5686808",
@@ -132,18 +169,17 @@ def run_all():
             "MPOS": "1111@923355923388"
         }
 
-        # ✅ Use same authorized headers
-        confirm_res_1 = requests.post(confirmation_url, headers=common_headers, json=confirmation_payload)
-        confirm_res_2 = requests.post(confirmation_url, headers=common_headers, json=confirmation_payload)
-
-        responses["CashDepositConfirmation_Run1"] = confirm_res_1.json()
-        responses["CashDepositConfirmation_Run2"] = confirm_res_2.json()
+        res1 = requests.post(confirmation_url, headers=common_headers, json=confirm_payload)
+        res2 = requests.post(confirmation_url, headers=common_headers, json=confirm_payload)
+        responses["CashDepositConfirmation_Run1"] = res1.json()
+        responses["CashDepositConfirmation_Run2"] = res2.json()
     except Exception as e:
         responses["CashDepositConfirmation"] = {"error": str(e)}
 
-    # --- 5️⃣ CashWithdrawalBVS API ---
+    # --- 5️⃣ CashWithdrawalBVS + Confirmation ---
     try:
-        payload = {
+        withdrawal_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCashWithdrawal/CashWithdrawalBVS"
+        withdrawal_payload = {
             "WithdrawAmount": "10",
             "Longitude": "31.5686808",
             "Latitude": "74.3000874",
@@ -154,21 +190,19 @@ def run_all():
             "ImageType": "4",
             "BioDeviceName": "test"
         }
-        url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCashWithdrawal/CashWithdrawalBVS"
-        res = requests.post(url, headers=common_headers, data=json.dumps(payload))
-        responses["CashWithdrawalBVS"] = res.json()
-    except Exception as e:
-        responses["CashWithdrawalBVS"] = {"error": str(e)}
 
-    # --- 6️⃣ CashWithdrawalBVS Confirmation ---
-    try:
-        payload = {
-            "TransactionID": "134914",
+        withdrawal_res = requests.post(withdrawal_url, headers=common_headers, json=withdrawal_payload)
+        withdrawal_data = withdrawal_res.json()
+        responses["CashWithdrawalBVS"] = withdrawal_data
+        txn_withdrawal = withdrawal_data.get("TransactionID") or withdrawal_data.get("transactionId") or withdrawal_data.get("TxnId")
+
+        confirm_payload = {
+            "TransactionID": txn_withdrawal,
             "TermsAccepted": "true",
-            "WithdrawAmount": "100",
+            "WithdrawAmount": "10",
             "Longitude": "31.5686808",
             "Latitude": "74.3000874",
-            "CustomerCNIC": "3740577357058",
+            "CustomerCNIC": "6110132583649",
             "CustomerMSISDN": "923376246667",
             "AcquiredAfis": "abcd",
             "FingerNumber": "2",
@@ -176,15 +210,16 @@ def run_all():
             "BioDeviceName": "test",
             "MPOS": "1111@923355923388"
         }
-        url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCashWithdrawal/CashWithdrawalBVS/Confirmation"
-        res = requests.post(url, headers=common_headers, data=json.dumps(payload))
-        responses["CashWithdrawalBVS_Confirmation"] = res.json()
+
+        confirm_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCashWithdrawal/CashWithdrawalBVS/Confirmation"
+        confirm_res = requests.post(confirm_url, headers=common_headers, json=confirm_payload)
+        responses["CashWithdrawalBVS_Confirmation"] = confirm_res.json()
     except Exception as e:
         responses["CashWithdrawalBVS_Confirmation"] = {"error": str(e)}
 
-    # --- 7️⃣ CNICtoMABVS API ---
+    # --- 6️⃣ CNICtoMABVS + Confirmation ---
     try:
-        payload = {
+        cnic_payload = {
             "ReceiverAccountNumber": "923345876677",
             "TermsAccepted": "true",
             "DepositAmount": "100",
@@ -198,38 +233,25 @@ def run_all():
             "FingerNumber": "1",
             "ImageType": "4"
         }
-        url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCNICtoMA/CNICtoMABVS"
-        res = requests.post(url, headers=common_headers, data=json.dumps(payload))
-        responses["CNICtoMABVS"] = res.json()
-    except Exception as e:
-        responses["CNICtoMABVS"] = {"error": str(e)}
+        cnic_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCNICtoMA/CNICtoMABVS"
+        cnic_res = requests.post(cnic_url, headers=common_headers, json=cnic_payload)
+        cnic_data = cnic_res.json()
+        responses["CNICtoMABVS"] = cnic_data
 
-    # --- 8️⃣ CNICtoMABVS Confirmation ---
-    try:
-        payload = {
-            "ReceiverAccountNumber": "923345876677",
-            "TransactionID": "147441",
-            "TermsAccepted": "true",
-            "DepositAmount": "100",
-            "DepositReason": "Education",
-            "Longitude": "31.5686808",
-            "Latitude": "74.3000874",
-            "SenderMSISDN": "923376246667",
-            "SenderCNIC": "3740577357007",
-            "AcquiredAfis": "test",
-            "BioDeviceName": "test",
-            "FingerNumber": "1",
-            "MPOS": "1233@923457685757",
-            "ImageType": "4"
+        txn_cnic = cnic_data.get("TransactionID") or cnic_data.get("transactionId") or cnic_data.get("TxnId")
+
+        confirm_payload = {
+            **cnic_payload,
+            "TransactionID": txn_cnic,
+            "MPOS": "1233@923457685757"
         }
-        url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCNICtoMA/CNICtoMABVSConfirmation"
-        res = requests.post(url, headers=common_headers, data=json.dumps(payload))
-        responses["CNICtoMABVS_Confirmation"] = res.json()
+        confirm_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/BVSCNICtoMA/CNICtoMABVSConfirmation"
+        confirm_res = requests.post(confirm_url, headers=common_headers, json=confirm_payload)
+        responses["CNICtoMABVS_Confirmation"] = confirm_res.json()
     except Exception as e:
         responses["CNICtoMABVS_Confirmation"] = {"error": str(e)}
 
-    session["final_response"] = json.dumps(responses, indent=4)
-    return redirect(url_for("home"))
+    return jsonify(responses)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5080, debug=True)
