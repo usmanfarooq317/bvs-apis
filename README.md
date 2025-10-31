@@ -1,6 +1,6 @@
 # 🧩 Run All APIs - Flask Project
 
-This project is a **Flask-based automation tool** that runs a series of APIs sequentially (OTP, Login, Cash Deposit, Withdrawal, and CNIC transfers).  
+This project is a **Flask-based automation tool** that runs a series of APIs sequentially (OTP, Login, BVSAccountRegistration OTP, Cash Deposit, Withdrawal, and CNIC transfers).  
 It displays **each API response beautifully formatted** in the browser when you click the **"Run All APIs"** button.
 
 ---
@@ -12,6 +12,7 @@ It displays **each API response beautifully formatted** in the browser when you 
 ✅ Reuses generated tokens automatically for dependent APIs  
 ✅ Executes **Cash Deposit Confirmation** twice with the same input  
 ✅ Automatically passes **TransactionID** between API calls  
+✅ Runs **BVSAccountRegistration OTP** three times with correct transaction ID chaining  
 ✅ Beautiful, modern, responsive UI with box-styled API responses  
 ✅ Flask backend with built-in API chaining logic  
 
@@ -21,24 +22,24 @@ It displays **each API response beautifully formatted** in the browser when you 
 
 1. **OTP API** → Generates OTP for user  
 2. **RetailerBVSLogin** → Logs in and returns `AccessToken` + `SessionID`  
-3. **CashDeposit** → Performs a deposit transaction  
-4. **CashDepositConfirmation** → Runs **twice** using the same transaction ID  
-5. **CashWithdrawalBVS** → Executes withdrawal and stores transaction ID  
-6. **CashWithdrawalBVS_Confirmation** → Confirms the withdrawal  
-7. **CNICtoMABVS** → Performs CNIC to MA transfer  
-8. **CNICtoMABVS_Confirmation** → Confirms the CNIC to MA transaction  
+3. **BVSAccountRegistration OTP** → Runs three times sequentially using transaction ID from first run  
+4. **CashDeposit** → Performs a deposit transaction  
+5. **CashDepositConfirmation** → Runs **twice** using the same transaction ID  
+6. **CashWithdrawalBVS** → Executes withdrawal and stores transaction ID  
+7. **CashWithdrawalBVS_Confirmation** → Confirms the withdrawal  
+8. **CNICtoMABVS** → Performs CNIC to MA transfer  
+9. **CNICtoMABVS_Confirmation** → Confirms the CNIC to MA transaction  
 
 ---
 
 ## 🧩 Project Structure
 
-📦 flask-run-all-apis
-├── app.py # Main Flask application
-├── README.md # Project documentation
-└── requirements.txt # Python dependencies (optional)
-
-yaml
-
+📦 flask-run-all-apis  
+├── app.py # Main Flask application  
+├── README.md # Project documentation  
+├── requirements.txt # Python dependencies  
+├── Dockerfile # Docker image definition  
+└── docker-compose.yml # Docker Compose setup  
 
 ---
 
@@ -46,14 +47,14 @@ yaml
 
 ### 1️⃣ Clone the Repository
 ```bash
-git clone https://github.com/yourusername/flask-run-all-apis.git
-cd flask-run-all-apis
-
-3️⃣ Install Dependencies
-
+git clone https://github.com/usmanfarooq317/bvs-apis.git
+cd bvs-apis
+2️⃣ Install Dependencies
+bash
+ code
 pip install flask requests
-
-4️⃣ Run the Flask App
+3️⃣ Run the Flask App
+bash
 
 python app.py
 🌐 Access the Application
@@ -80,14 +81,23 @@ lua
 | { "AccessToken": "...",     |
 |   "SessionID": "..." }      |
 +-----------------------------+
+
++-----------------------------+
+| BVSAccountRegistration OTP  |
+|-----------------------------|
+| { "TransactionID": "148879",|
+|   "ResponseCode": "100" }   |
++-----------------------------+
 ⚠️ Notes
-Each run will generate a new AccessToken and SessionID automatically.
+Each run generates a new AccessToken and SessionID automatically.
 
 Tokens are reused for all APIs that require authentication.
 
 Cash Deposit Confirmation runs two times automatically.
 
-Ensure your API URLs and credentials (like Client ID/Secret) are correct.
+BVSAccountRegistration OTP runs three times sequentially using the transaction ID from the first run.
+
+Ensure your API URLs and credentials (Client ID/Secret, username/password) are correct.
 
 🧑‍💻 Tech Stack
 Backend: Flask (Python)
@@ -97,3 +107,17 @@ HTTP Requests: Requests Library
 Frontend: Vanilla JS + HTML + CSS
 
 API Display: JSON pretty print inside HTML containers
+
+🐳 Docker Setup
+1️⃣ Build Docker Image
+bash
+
+docker build -t bvs-api-dashboard .
+2️⃣ Run Container
+bash
+
+docker run -p 5080:5080 bvs-api-dashboard
+3️⃣ Using Docker Compose
+bash
+
+docker-compose up --build

@@ -1,0 +1,9 @@
+version: "3.9"
+
+services:
+  bvs-dashboard:
+    build: .
+    container_name: bvs-apis-dashboard
+    ports:
+      - "5080:5080"
+    restart: unless-stopped
