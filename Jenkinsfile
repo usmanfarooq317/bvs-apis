@@ -94,7 +94,7 @@ pipeline {
 
     post {
         success {
-            echo "✅ Build, Push & Deploy .....Successful! Version: ${env.NEW_VERSION}"
+            echo "✅ Build, Push & Deploy Successful! Version: ${env.NEW_VERSION}"
         }
         failure {
             echo "❌ Pipeline Failed! Docker tag is now reverted if created."
