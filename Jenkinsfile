@@ -8,13 +8,12 @@ pipeline {
     environment {
         DOCKER_USER = 'usmanfarooq317'
         IMAGE_NAME = 'bvs-apis-dashboard'
-        GIT_REPO = 'https://github.com/usmanfarooq317/bvs-apis.git'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: "${GIT_REPO}"
+                git branch: 'main', url: 'https://github.com/usmanfarooq317/bvs-apis.git'
             }
         }
 
