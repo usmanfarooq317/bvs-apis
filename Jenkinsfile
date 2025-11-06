@@ -57,13 +57,13 @@ pipeline {
             }
         }
 
-        stage('Deploy to EC2') {
+                stage('Deploy to EC2') {
             steps {
                 script {
                     try {
-                        sshagent(['ec2-ssh-key']) {
+                        sshagent(['usman-ec2-key']) {   // <-- change to new Jenkins SSH credential ID
                             sh """
-                                ssh -o StrictHostKeyChecking=no ubuntu@54.89.241.89 '
+                                ssh -o StrictHostKeyChecking=no ubuntu@13.50.238.43 '
                                     docker pull ${DOCKER_USER}/${IMAGE_NAME}:${env.NEW_VERSION} &&
                                     docker stop bvs-apis-dashboard || true &&
                                     docker rm bvs-apis-dashboard || true &&
@@ -73,8 +73,7 @@ pipeline {
                         }
                     } catch (err) {
                         echo "❌ EC2 Deploy Failed! Reverting Docker Tag..."
-                        
-                        // Remove tag from DockerHub
+
                         withCredentials([usernamePassword(credentialsId: 'docker-hub', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                             sh """
                                 curl -X DELETE -u "${DOCKER_USER}:${DOCKER_PASS}" \
@@ -82,7 +81,6 @@ pipeline {
                             """
                         }
 
-                        // Remove locally from Jenkins
                         sh "docker rmi ${DOCKER_USER}/${IMAGE_NAME}:${env.NEW_VERSION} || true"
 
                         error("Deployment failed, tag reverted.")
@@ -90,6 +88,7 @@ pipeline {
                 }
             }
         }
+
     }
 
     post {
