@@ -83,7 +83,7 @@ pipeline {
 
                         sh "docker rmi ${DOCKER_USER}/${IMAGE_NAME}:${env.NEW_VERSION} || true"
 
-                        error("Deployment failed, tag reverted.")
+                        error("Deployment Failed, tag reverted.")
                     }
                 }
             }
