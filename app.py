@@ -21,6 +21,13 @@ HTML_PAGE = """
     color: #333;
     line-height: 1.6;
   }
+  .hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  font-style: italic;
+}
   .container { max-width: 1000px; margin: 40px auto; padding: 20px; }
   h1, h2, h3 { color: #222; }
   h1 { text-align: center; margin-bottom: 30px; }
@@ -94,13 +101,14 @@ function showLoading() {
 </head>
 <body>
 <div class="container">
-  <h1>🔐 IBM/RSA API Dashboard</h1>
+  <h1>🔐 IBM/RSA BVS-API Dashboard</h1>
 
   <div class="card">
     <h3>Run All APIs</h3>
     <form method="POST" action="/run_all" onsubmit="showLoading()">
       <label for="user">Mobile Number</label>
-      <input type="text" id="user" name="user" value="{{ mobile_number }}" placeholder="Enter mobile number" required>
+      <input type="text" id="user" name="user" value="{{ mobile_number }}" placeholder="Enter mobile number@merchid" required>
+      <div class="hint">Enter Mobile Number in this format (e.g., 923431664399@2900)</div>
       <button type="submit">🚀 Run All APIs</button>
     </form>
     <div id="loading" class="loading" style="display:none;">Processing... Please wait ⏳</div>
