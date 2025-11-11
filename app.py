@@ -1,5 +1,6 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session
 import requests, json
+import re
 
 app = Flask(__name__)
 app.secret_key = "supersecret"
@@ -99,7 +100,7 @@ function showLoading() {
     <h3>Run All APIs</h3>
     <form method="POST" action="/run_all" onsubmit="showLoading()">
       <label for="user">Mobile Number</label>
-      <input type="text" id="user" name="user" value="923431664399" readonly>
+      <input type="text" id="user" name="user" value="{{ mobile_number }}" placeholder="Enter mobile number" required>
       <button type="submit">🚀 Run All APIs</button>
     </form>
     <div id="loading" class="loading" style="display:none;">Processing... Please wait ⏳</div>
@@ -120,19 +121,40 @@ function showLoading() {
 </html>
 """
 
+def extract_mobile_number(user_input):
+    """
+    Extract mobile number from user input.
+    If input contains '@', return only the mobile number part.
+    Otherwise, return the input as is.
+    """
+    if '@' in user_input:
+        return user_input.split('@')[0]
+    return user_input
+
 @app.route("/", methods=["GET"])
 def home():
     final_response = session.pop("final_response", None)
+    mobile_number = session.get("mobile_number", "923431664399@2900")
+    
     if final_response:
         try:
             final_response = json.loads(final_response)
         except:
             final_response = {}
-    return render_template_string(HTML_PAGE, final_response=final_response)
+    return render_template_string(HTML_PAGE, final_response=final_response, mobile_number=mobile_number)
 
 @app.route("/run_all", methods=["POST"])
 def run_all():
-    user = request.form.get("user")
+    user_input = request.form.get("user")
+    # Store the original user input in session for persistence
+    session["mobile_number"] = user_input
+    
+    # Extract mobile number for APIs (remove @2900 part if present)
+    mobile_number = extract_mobile_number(user_input)
+    
+    # For login API, use the original input (with @2900 if provided)
+    login_user = user_input if '@' in user_input else f"{user_input}@1010"
+    
     otp = "491765"
     pin = "12121"
 
@@ -146,7 +168,7 @@ def run_all():
 
     # --- 1️⃣ OTP API ---
     try:
-        otp_payload = {"MSISDN": user}
+        otp_payload = {"MSISDN": mobile_number}  # Use mobile number without @2900
         otp_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/RetailerBVSLogin/OTPGeneration"
         otp_res = requests.post(otp_url, headers=headers, json=otp_payload)
         responses["OTP_API"] = otp_res.json()
@@ -155,7 +177,7 @@ def run_all():
 
     # --- 2️⃣ RetailerBVSLogin API ---
     try:
-        login_payload = {"OTP": otp, "User": f"{user}@1010", "Pin": pin}
+        login_payload = {"OTP": otp, "User": login_user, "Pin": pin}  # Use login_user which may include @2900
         login_url = "https://rgw.8798-f464fa20.eu-de.ri1.apiconnect.appdomain.cloud/tmfb/dev-catalog/RetailerBVSLogin"
         login_res = requests.post(login_url, headers=headers, json=login_payload)
         login_data = login_res.json()
@@ -172,9 +194,9 @@ def run_all():
         **headers,
         "Authorization": f"Bearer {access_token}" if access_token else "",
         "Sessionid": session_id if session_id else "",
-        "X-Username": f"{user}@1010",
+        "X-Username": login_user,  # Use login_user which may include @2900
         "X-Password": pin,
-        "MPOS": "1111@923355923388"
+        "MPOS": f"1111@{mobile_number}"  # Use mobile number without @2900
     }
 
     # --- 3️⃣ BVSAccountRegistration OTP (3 runs) ---
@@ -185,7 +207,7 @@ def run_all():
             "Longitude": "31.5686808",
             "Latitude": "74.3000874",
             "CustomerCNIC": "3740567242112",
-            "CustomerMSISDN": "923054517876",
+            "CustomerMSISDN": mobile_number,  # Use mobile number without @2900
             "AcquiredAfis": "abcd",
             "FingerNumber": "2",
             "ImageType": "4",
@@ -210,12 +232,12 @@ def run_all():
             "Longitude": "31.5686808",
             "Latitude": "74.3000874",
             "CustomerCNIC": "3740577357058",
-            "CustomerMSISDN": "923376246667",
+            "CustomerMSISDN": mobile_number,  # Use mobile number without @2900
             "AcquiredAfis": "abcd",
             "FingerNumber": "2",
             "ImageType": "4",
             "BioDeviceName": "test",
-            "MPOS": "1111@923355923388"
+            "MPOS": f"1111@{mobile_number}"  # Use mobile number without @2900
         }
         deposit_res = requests.post(deposit_url, headers=common_headers, json=deposit_payload)
         deposit_data = deposit_res.json()
@@ -235,12 +257,12 @@ def run_all():
             "Longitude": "31.5686808",
             "Latitude": "74.3000874",
             "CustomerCNIC": "3740577357058",
-            "CustomerMSISDN": "923376246667",
+            "CustomerMSISDN": mobile_number,  # Use mobile number without @2900
             "AcquiredAfis": "abcd",
             "FingerNumber": "2",
             "ImageType": "4",
             "BioDeviceName": "test",
-            "MPOS": "1111@923355923388"
+            "MPOS": f"1111@{mobile_number}"  # Use mobile number without @2900
         }
         for i in range(1, 3):
             res = requests.post(confirmation_url, headers=common_headers, json=confirmation_payload)
@@ -255,7 +277,7 @@ def run_all():
             "Longitude": "31.5686808",
             "Latitude": "74.3000874",
             "CustomerCNIC": "6110132583649",
-            "CustomerMSISDN": "923376246667",
+            "CustomerMSISDN": mobile_number,  # Use mobile number without @2900
             "AcquiredAfis": "abcd",
             "FingerNumber": "2",
             "ImageType": "4",
@@ -288,7 +310,7 @@ def run_all():
             "DepositReason": "Education",
             "Longitude": "31.5686808",
             "Latitude": "74.3000874",
-            "SenderMSISDN": "923376246667",
+            "SenderMSISDN": mobile_number,  # Use mobile number without @2900
             "SenderCNIC": "3740577357007",
             "AcquiredAfis": "test",
             "BioDeviceName": "test",

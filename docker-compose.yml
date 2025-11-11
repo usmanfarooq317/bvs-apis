@@ -3,6 +3,7 @@ version: "3.9"
 services:
   bvs-dashboard:
     build: .
+    image: bvs-api-dashboard
     container_name: bvs-apis-dashboard
     ports:
       - "5080:5080"
